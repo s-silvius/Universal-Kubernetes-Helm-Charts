@@ -1,50 +1,48 @@
-{{- if .Values.ingress_secondary.enabled -}}
+{{- define "ingress.template" -}}
 {{- $toplevel := . }}
+{{- $ingressPathType := .pathType | default "Prefix" -}}
+{{- $ingressClassName := .ingressClassName | default "" -}}
+{{- $nginx_affinity := .nginx_affinity | default true -}}
+{{- $hosts := .hosts -}}
+{{- $enableMultiPath := .enableMultiPath | default false -}}
 {{- $ingressApiIsStable := eq (include "ingress.isStable" .) "true" -}}
 {{- $ingressSupportsIngressClassName := eq (include "ingress.supportsIngressClassName" .) "true" -}}
 {{- $ingressSupportsPathType := eq (include "ingress.supportsPathType" .) "true" -}}
-{{- $ingressPathType := .Values.ingress_secondary.pathType -}}
-################################################
-# Standardized Templates - Ingress
-# Author/Maintainer: Farley <farley@neonsurge.com>
-################################################
+{{- $ingressNamePostfix := .ingressNamePostfix | default "" -}}
 {{- $fullName := include "name" . }}
 apiVersion: {{ template "ingress.apiVersion" . }}
 kind: Ingress
 metadata:
-  # Old without template override: name: {{ template "name" . }}
-  name: {{ template "ingress_secondary.name" . }}
-  # SHOULD USE name: {{ template "name" . }}
-  # include labels for this service to identify it.  This helper automatically generated the labels: so do not specify it here
+  name: {{ template "ingress.name" (dict "Values" .Values "postfix" $ingressNamePostfix) }}
 {{- include "labels" . | indent 2 }}
   annotations:
-{{- if not .Values.ingress_secondary.ingressClassName }}
-    kubernetes.io/ingress.class: {{ .Values.ingress_secondary.nginx_class | quote }}
+{{- if and (not $ingressSupportsIngressClassName) .ingressClassName }}
+    kubernetes.io/ingress.class: {{ .ingressClassName | quote }}
 {{- end }}
-{{ if .Values.ingress_secondary.nginx_affinity }}
+{{ if $nginx_affinity }}
     nginx.ingress.kubernetes.io/affinity: "cookie"
     nginx.ingress.kubernetes.io/session-cookie-name: "route"
     nginx.ingress.kubernetes.io/session-cookie-path: "/"
     nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
     nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
 {{- end }}
-{{ with .Values.ingress_secondary.annotations }}
+{{ with .annotations -}}
 {{ tpl ( toYaml .) $ | indent 4 }}
 {{- end }}
 spec:
-  {{- if and $ingressSupportsIngressClassName .Values.ingress_secondary.ingressClassName }}
-  ingressClassName: {{ .Values.ingress_secondary.ingressClassName }}
+  {{- if and $ingressSupportsIngressClassName .ingressClassName }}
+  ingressClassName: {{ .ingressClassName }}
   {{- end }}
   rules:
-  {{- range .Values.ingress_secondary.hosts }}
+  {{- range $hosts }}
     - host: {{ tpl .host $ | quote }}
       http:
         paths:
-      {{- if .enableMultiPath -}}
+      {{- if $enableMultiPath -}}
         {{- range .paths }}
           - path: {{ .path }}
             {{- if $ingressSupportsPathType }}
-            pathType: {{ $ingressPathType }}
+            pathType: {{ .pathType | default $ingressPathType }}
             {{- end }}
             backend:
               {{- if $ingressApiIsStable }}
@@ -77,7 +75,7 @@ spec:
       {{- end }}
   {{- end }}
 
-{{- with .Values.ingress_secondary.tls }}
+{{- with .Values.ingress.tls }}
   tls:
 {{- range . }}
       - hosts:
@@ -89,5 +87,4 @@ spec:
         {{- end }}
 {{- end }}
 {{- end -}}
-
 {{- end }}

@@ -44,7 +44,7 @@ spec:
 {{ toYaml .Values.service.additionalPorts | indent 4 }}
 {{- end }}
   selector:
-{{- if .Values.usingNewRecommendedLabels }}
+{{- if .Values.usingRecommendedLabels }}
 {{- if .Values.labelsEnableDefault }}
     app.kubernetes.io/name: {{ template "name" . }}
 {{- end }}
@@ -56,5 +56,4 @@ spec:
 {{- if .Values.labels }}
 {{ toYaml .Values.labels | indent 4 }}
 {{- end }}
-
 {{- end }}

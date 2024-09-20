@@ -42,58 +42,48 @@ Create chart name and version as used by the chart label.  Version is optional b
 {{- end -}}
 {{- end -}}
 
+
 {{/*
 Generate basic labels for pods/services/etc
 Sample Usage: {{- include "labels" . | indent 2 }}
 */}}
 {{- define "labels" }}
 labels:
-
-{{- if .Values.usingNewRecommendedLabels }}
-# see: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-
+{{- if .Values.usingRecommendedLabels }}
+  # see: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 {{- if .Values.labelsEnableDefault }}
   app.kubernetes.io/name: {{ .Values.name | trunc 63 | trimSuffix "-" | quote }}
-  app.kubernetes.io/instance: {{ .Values.name | trunc 63 | trimSuffix "-" | quote }}
+  app.kubernetes.io/instance: {{ printf "%s-%s" .Values.name .Release.Name | quote }}
 {{- end }}
-
 {{- else }}
-
 {{- if .Values.labelsEnableDefault }}
   app: {{ .Values.name | trunc 63 | trimSuffix "-" | quote }}
 {{- end }}
-
 {{- end }}
-
 {{ include "labels_without_key_or_name" . | indent 2 }}
-
 {{- end }}
 
 
-
-{{- define "labels_without_key_or_name" }}
-{{- if .Values.usingNewRecommendedLabels }}
+{{- define "labels_without_key_or_name" -}}
+{{- if .Values.usingRecommendedLabels }}
 # see: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 app.kubernetes.io/version: {{ .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" | quote }}
 app.kubernetes.io/component: {{ .Chart.Name | replace "+" "_" | trunc 63 | trimSuffix "-" | quote }}
 app.kubernetes.io/created-by: "devops-nirvana"
 app.kubernetes.io/managed-by: "helm"
-{{ if .Values.labels -}}
+{{ if .Values.labels }}
 {{ toYaml .Values.labels }}
 {{- end }}
-
 {{- else }}
 chart: {{ include "chart" . | quote }}
 release: {{ .Release.Name | quote }}
 heritage: {{ .Release.Service | quote }}
 helm_chart_author: "devops-nirvana"
 generator: "helm"
-{{ if .Values.labels -}}
+{{ if .Values.labels }}
 {{ toYaml .Values.labels }}
 {{- end }}
-
 {{- end }}
-
 {{- end }}
 
 
@@ -136,73 +126,72 @@ no-image-tag-could-be-found
 
 {{- end -}}
 
+{{/*
+Create the name of the configmap resource
+*/}}
+{{- define "configmap.name" -}}
+{{- $postfix := .postfix | default "" -}}
+{{- $configMapName := .configMapName | default "" -}}
+{{- if $configMapName -}}
+  {{ $configMapName }}
+{{- else if $postfix -}}
+  {{ template "name" . }}-configmap-{{ $postfix }}
+{{- else -}}
+  {{ template "name" . }}-configmap
+{{- end -}}
+{{- end -}}
+
 
 {{/*
 Create the name of the ingress resource (used for legacy purposes and zero downtime for legacy)
 */}}
 {{- define "ingress.name" -}}
+{{- $postfix := .postfix | default "" -}}
 {{- if .Values.ingress.name -}}
-    {{ .Values.ingress.name }}
+  {{ .Values.ingress.name }}-ingress
 {{- else -}}
-    {{ template "name" . }}
+  {{ template "name" . }}-ingress-{{ $postfix }}
 {{- end -}}
 {{- end -}}
 
-
-{{/*
-Create the name of the ingress_secondary resource (used for legacy purposes and zero downtime for legacy)
-*/}}
-{{- define "ingress_secondary.name" -}}
-{{- if .Values.ingress_secondary.name -}}
-    {{ .Values.ingress_secondary.name }}
-{{- else -}}
-    {{ template "name" . }}
-{{- end -}}
-{{- end -}}
 
 {{/*
 Return the appropriate apiVersion for deployment.
 */}}
 {{- define "deployment.apiVersion" -}}
-  {{- print "apps/v1" -}}
+  {{- print "apps/v1" | trim }}
 {{- end -}}
 
 {{/*
 Return the appropriate apiVersion for daemonset.
 */}}
 {{- define "daemonset.apiVersion" -}}
-  {{- print "apps/v1" -}}
+  {{- print "apps/v1" | trim }}
 {{- end -}}
 
 {{/*
 Return the appropriate apiVersion for statefulset.
 */}}
 {{- define "statefulset.apiVersion" -}}
-  {{- print "apps/v1" -}}
+  {{- print "apps/v1" | trim }}
 {{- end -}}
 
 {{/*
 Return the appropriate apiVersion for networkpolicy.
 */}}
 {{- define "networkPolicy.apiVersion" -}}
-  {{- print "networking.k8s.io/v1" -}}
+  {{- print "networking.k8s.io/v1" | trim }}
 {{- end -}}
 
-{{/*
-Return the appropriate apiVersion for podsecuritypolicy.
-*/}}
-{{- define "podSecurityPolicy.apiVersion" -}}
-  {{- print "policy/v1beta1" -}}
-{{- end -}}
 
 {{/*
 Return the appropriate apiVersion for rbac.
 */}}
 {{- define "rbac.apiVersion" -}}
   {{- if (default $.Capabilities "").APIVersions.Has "rbac.authorization.k8s.io/v1" }}
-    {{- print "rbac.authorization.k8s.io/v1" -}}
+    {{- print "rbac.authorization.k8s.io/v1" | trim }}
   {{- else -}}
-    {{- print "rbac.authorization.k8s.io/v1beta1" -}}
+    {{- print "rbac.authorization.k8s.io/v1beta1" | trim }}
   {{- end -}}
 {{- end -}}
 
@@ -210,7 +199,7 @@ Return the appropriate apiVersion for rbac.
 Return the appropriate apiVersion for cronjob.
 */}}
 {{- define "cronjob.apiVersion" -}}
-  {{ ternary "batch/v1" "batch/v1beta1" (.Capabilities.APIVersions.Has "batch/v1") }}
+  {{ print (ternary "batch/v1" "batch/v1beta1" (.Capabilities.APIVersions.Has "batch/v1")) | trim }}
 {{- end -}}
 
 
@@ -219,11 +208,11 @@ Return the appropriate apiVersion for ingress.
 */}}
 {{- define "ingress.apiVersion" -}}
   {{- if (default $.Capabilities "").APIVersions.Has "networking.k8s.io/v1" }}
-    {{- print "networking.k8s.io/v1" -}}
+    {{- print "networking.k8s.io/v1" | trim }}
   {{- else if .Capabilities.APIVersions.Has "networking.k8s.io/v1beta1" -}}
-    {{- print "networking.k8s.io/v1beta1" -}}
+    {{- print "networking.k8s.io/v1beta1" | trim }}
   {{- else -}}
-    {{- print "extensions/v1beta1" -}}
+    {{- print "extensions/v1beta1" | trim }}
   {{- end -}}
 {{- end -}}
 
@@ -231,19 +220,19 @@ Return the appropriate apiVersion for ingress.
 Return the appropriate apiVersion for poddisruptionbudget.
 */}}
 {{- define "pdb.apiVersion" -}}
-  {{- if (default $.Capabilities "").APIVersions.Has "policy/v1" }}
-    {{- print "policy/v1" -}}
-  {{- else -}}
-    {{- print "policy/v1beta1" -}}
-  {{- end -}}
+  {{- print "policy/v1" | trim }}
 {{- end -}}
 
 {{/*
 Return the appropriate apiVersion for horizontalpodautoscaler.
 */}}
 {{- define "hpa.apiVersion" -}}
-  {{ ternary "autoscaling/v2" "autoscaling/v2beta2" (.Capabilities.APIVersions.Has "autoscaling/v2") }}
-{{- end }}
+  {{- if .Capabilities.APIVersions }}
+    {{- print (ternary "autoscaling/v2" "autoscaling/v1" (.Capabilities.APIVersions.Has "autoscaling/v2")) | trim }}
+  {{- else -}}
+    {{- print "autoscaling/v1" | trim }}
+  {{- end -}}
+{{- end -}}
 
 {{/*
 Return if ingress is stable.

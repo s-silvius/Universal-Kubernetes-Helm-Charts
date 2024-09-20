@@ -10,6 +10,9 @@ home: https://github.com/DevOps-Nirvana/Universal-Kubernetes-Helm-Charts
 sources:
   - https://devops-nirvana.s3.amazonaws.com/helm-charts/
   - https://github.com/DevOps-Nirvana/Universal-Kubernetes-Helm-Charts/charts/deployment
+  - https://github.com/s-silvius/Universal-Kubernetes-Helm-Charts
 maintainers:
   - name: Farley Farley
     email: farley@neonsurge.com
+  - name: Samuli Silvius
+    email: samuli.silvius@nokia.com

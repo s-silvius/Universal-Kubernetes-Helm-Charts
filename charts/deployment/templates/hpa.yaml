@@ -11,7 +11,7 @@ metadata:
 {{- include "labels" . | indent 2 }}
 spec:
   scaleTargetRef:
-    apiVersion: apps/v2beta1
+    apiVersion: apps/v1
     kind: Deployment
     name: {{ template "name" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}

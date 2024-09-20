@@ -1,0 +1,13 @@
+{{- $values := .Values -}}
+{{- $release := .Release -}}
+{{- $chart := .Chart -}}
+{{- $template := .Template -}}
+{{- $files := .Files -}}
+{{- $configmaps := .Values.configmaps | default dict -}}
+
+{{- range $name, $configmap := $configmaps }}
+{{- if and $configmap $name }}
+{{- include "configmap.template" (dict "configmapNamePostfix" $name "configMapName" $configmap.name "data" $configmap.data "dataFromfile" $configmap.dataFromfile "annotations" $configmap.annotations "Values" $values "Release" $release "Chart" $chart "Template" $template "Files" $files) }}
+---
+{{ end }}
+{{- end }}

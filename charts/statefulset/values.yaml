@@ -1,7 +1,7 @@
 # Default values for a "statefulset"
 
 # REQUIRED for you to set a value here, name of your service
-name: ""
+name: "override-this-name"
 
 # Number of pods in statefulset, default of not highly available (override on HA environments)
 replicaCount: 1
@@ -29,10 +29,10 @@ image:
   # Which image to release (NOTE: ONLY SPECIFY IF YOU ARE DEPLOYING EXTERNALLY, eg from dockerhub)
   tag: ""
   # Which repo to use (NOTE: ONLY SPECIFY IF YOU ARE DEPLOYING EXTERNALLY)
-  repository: ""
-  # Which command to run (NOTE: ONLY SPECIFY IF YOU NEED)
+  repository: "override this repository"
+  # Which command to run (NOTE: ONLY SPECIFY IF YOU NEED, IF NOT SPECIFIED WILL USE DOCKER DEFAULT)
   command: []
-  # What args to pass to the command (NOTE: ONLY SPECIFY IF YOU NEED)
+  # What args to pass to the command (NOTE: ONLY SPECIFY IF YOU NEED, IF NOT SPECIFIED WILL USE DOCKER DEFAULT)
   args: []
   # Image pull policy: IfNotPresent / Always
   imagePullPolicy: IfNotPresent
@@ -48,18 +48,11 @@ image:
 # To change the securityContext for the pod.
 # Everything under 'podSecurityContext' will be copied as-is under the 'securityContext' key for the pod spec
 # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
-# NOTE: this replaces the old "security" key, which is now deprecated
 #
-# podSecurityContext:
-#   runAsNonRoot: true
-#   runAsUser: 1000
-#   fsGroup: 1000
-
-# DEPRECATED / DO NOT USE, use podSecurityContext instead, this will be removed in a future release
-security:
-  runAsNonRoot: false
-  runAsUser: 1000
-  fsGroup: 1000
+podSecurityContext:
+  runAsNonRoot: true
+#  runAsUser: 1000
+#  fsGroup: 1000
 
 # To change the securityContext for the container. There are some different options k8s allows here vs at the pod level above.
 # Everything under 'containerSecurityContext' will be copied as-is under the 'securityContext' key for the container spec
@@ -74,22 +67,38 @@ security:
 # Ingress definitions
 ingress:
   enabled: false
-  # If we want to override the name, RECOMMEND YOU DO NOT DO THIS UNLESS YOU NEED, it has a sane default
-  name: ""
-  # If we want to have affinity in nginx enabled
-  nginx_affinity: true
-  # This is for the nginx controllers, this should be set to the controller that is intended to route your service
-  nginx_class: "infrastructure"
-  # This is the "new" name for ingress classes, optional
-  ingressClassName: ""
-  # The path type
-  pathType: ImplementationSpecific # or Prefix
-  annotations: {}
-  hosts:
-    - host: chart-example.local
-      paths:
-        - /
-  tls: []
+  primary:
+    enabled: true
+    name: "primary-ingress"
+    # If we want to have affinity in nginx enabled
+    nginx_affinity: true
+    pathType:  Prefix # Prefix or ImplementationSpecific. Default is Prefix.
+    ingressClassName: "nginx"
+    enableMultiPath: false
+    annotations: {}
+    hosts:
+      - host: primary.example.com
+        paths:
+          - path: /
+            serviceName: primary-service
+            servicePort: 80
+    tls: []
+  secondary:
+    enabled: false
+    name: "secondary-ingress"
+    # If we want to have affinity in nginx enabled
+    nginx_affinity: true
+    pathType:  Prefix # Prefix or ImplementationSpecific. Default is Prefix.
+    ingressClassName: "nginx"
+    enableMultiPath: false
+    annotations: {}
+    hosts:
+      - host: secondary.example.com
+        paths:
+          - path: /
+            serviceName: secondary-service
+            servicePort: 80
+    tls: []
 
 # Service definitions
 service:
@@ -97,7 +106,7 @@ service:
   annotations: {}
   type: ClusterIP
   port: 80
-  targetPort: 80
+  targetPort: 8080
   name: default-service
   # allocateLoadBalancerNodePorts: false
   # externalTrafficPolicy: Local
@@ -116,9 +125,9 @@ podAnnotations: {}
 
 # If you're using Kubernetes 1.20+ you'll want to enable this, this uses the new common label scheme
 # See: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-# This is set to "false" by default for backwards compatibility reasons.  Ideally, all of your sub-charts
+# This is set to "true" by default. Ideally, all of your sub-charts
 # use or do not use this.
-usingNewRecommendedLabels: false
+usingRecommendedLabels: true
 
 # Additional labels put onto anything that can be labelled (pods, services)
 labels: {}
@@ -129,7 +138,7 @@ labelsIncludeChartVersion: false
 # This enables the "default" label we automatically put everywhere (app: <name>)
 labelsEnableDefault: true
 
-# This adds lifecycle events for the statefulset
+# This adds lifecycle events
 lifecycle: {}
 
 # Environment variables (for globals, all deployments)
@@ -169,7 +178,7 @@ livenessProbe:
   # parameters for probes
   scheme: HTTP
   path: /alive
-  port: default-service
+  port: 8080
   command:
     - ls -la /
 
@@ -191,7 +200,7 @@ readinessProbe:
   # parameters for probes
   scheme: HTTP
   path: /ready
-  port: default-service
+  port: 8080
   command:
     - ls -la /
 
@@ -212,14 +221,37 @@ dnsConfig:
 # this is set VERY low by default, to be aggressive above resource limiting, please override this if necessary
 # Note: Limits are HARD Limits
 #       Requests are "soft" limits and are what affects HPA (autoscaling) aggressiveness and are what is guaranteed
-resources: {}
+resources:
+  limits:
+    cpu: 100m
+    memory: 64Mi
+  requests:
+    cpu: 50m
+    memory: 32Mi
 
-# limits:
-#  cpu: 100m
-#  memory: 64Mi
-# requests:
-#  cpu: 50m
-#  memory: 32Mi
+affinity:
+  enabled: true
+  podAntiAffinity:
+    enabled: true
+    # For antiaffinity 2 default podAffinityTerm is available and user only needs to select the setting mode for default content.
+    # mode can be set to "required" or "preferred".
+    mode: preferred
+    # If default podAntiAffinity is not what is wanted, user can define explitly antiaffinity value whihc will override the default.
+    # value:
+    #   preferredDuringSchedulingIgnoredDuringExecution:
+    #     - weight: 100
+    #       podAffinityTerm:
+    #         labelSelector:
+    #           matchExpressions:
+    #             - key: app.kubernetes.io/name
+    #               operator: In
+    #               values:
+    #                 - your-app-name
+    #         topologyKey: "kubernetes.io/hostname"
+  podAffinity:
+    enabled: false
+    # Define the podAffinity value here
+    #value: {}
 
 # Assign pods to nodes based on nodeSelector labels, define a default here if desired
 nodeSelector: {}
@@ -244,6 +276,28 @@ extraContainers: []
 volumes: []
 volumeMounts: []
 
+# Define any number of configMaps
+# If configmaps.configmap2.name given explicitly, it's named with that name.
+# Otherwise, configmap is named with the <name>-configmap-<key of the configmap> E.g. override-this-name-configmap-configmap1
+# TODO: Helm Library charts has limitation that .Files.Get scope is chart specific
+# so it sees only files in the library chart folder and not in the main chart folder that uses library chart as an dependency.
+# So, currently only inlide data for configMaps are supported. If user wants to use .Files functions, need to create configMap manifest in the main chart folder.
+configmaps: {}
+  # configmap1:
+  #   annotations: {}
+  #   data:
+  #     key1: value1
+  #     key2: value2
+  # configmap2:
+  #   name: configmap2
+  #   annotations: {}
+  #   data:
+  #     keyA: valueA
+  #     keyB: valueB
+  # configmap-fromfile:
+  #   dataFromfile:
+  #     key: files/somefile.yaml
+
 # For AWS Security Groups
 securityGroupIDs: []
 
@@ -261,6 +315,13 @@ global:
 
 sidecar:
   enabled: false
+sidecars: []
+  # - name: sidecar1
+  #   image: sidecar1-image
+  #   imagePullPolicy: IfNotPresent
+  # - name: sidecar2
+  #   image: sidecar2-image
+  #   imagePullPolicy: Always
 
 # This is for service accounts
 serviceAccount:
@@ -271,7 +332,7 @@ serviceAccount:
     # Here's an example of assigning an IAM role to a pod
     # eks.amazonaws.com/role-arn: arn:aws:iam::123123123:role/role-name-goes-here
 
-# If we want a hostname set for this statefulset
+# If we want a hostname set
 hostname: ""
 
 # This is incase we want persistence (a mounted volume) which is pretty standard on a statefulset
