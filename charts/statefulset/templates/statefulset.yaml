@@ -1,3 +1,7 @@
+################################################
+# Standardized Templates - Statefulset
+# Author/Maintainer: Farley <farley@neonsurge.com>
+################################################
 apiVersion: {{ template "statefulset.apiVersion" . }}
 kind: StatefulSet
 
